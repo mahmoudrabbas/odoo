@@ -9,6 +9,7 @@
                 <field name="last_name"/>
                 <field name="age"/>
                 <field name="blood_type"/>
+                <field name="state"/>
             </list>
         </field>
     </record>
@@ -19,6 +20,7 @@
         <field name="arch" type="xml">
             <form>
                 <sheet>
+
                     <group>
                         <field name="first_name"/>
                         <field name="last_name"/>
@@ -27,9 +29,17 @@
                     </group>
 
                     <group>
+                        <field name="department_id"/>
+                        <field name="department_capacity" readonly="1"/>
+                        <field name="doctor_ids" widget="many2many_tags"
+                               readonly="not department_id"/>
+                    </group>
+
+                    <group>
                         <field name="blood_type"/>
                         <field name="pcr"/>
-                        <field name="cr_ratio"/>
+                        <field name="cr_ratio" required="pcr"/>
+                        <field name="state"/>
                     </group>
 
                     <group>
@@ -38,8 +48,21 @@
                     </group>
 
                     <group>
-                        <field name="history"/>
+                        <field name="history" invisible="age &lt; 50"/>
                     </group>
+
+                    <notebook>
+                        <page string="Logs">
+                            <field name="log_ids">
+                                <list>
+                                    <field name="created_by"/>
+                                    <field name="date"/>
+                                    <field name="description"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+
                 </sheet>
             </form>
         </field>
@@ -52,9 +75,20 @@
     </record>
 
     <menuitem id="hms_root" name="HMS"/>
+
     <menuitem id="hms_patient_menu"
               name="Patients"
               parent="hms_root"
               action="patient_action"/>
+
+    <menuitem id="department_menu"
+              name="Departments"
+              parent="hms_root"
+              action="department_action"/>
+
+    <menuitem id="doctor_menu"
+              name="Doctors"
+              parent="hms_root"
+              action="doctor_action"/>
 
 </odoo>
