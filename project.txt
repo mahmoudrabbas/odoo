@@ -1,0 +1,525 @@
+
+===== ./README.md =====
+## Preview
+
+![image 2](preview/1.png)
+![image 1](preview/0.png)
+
+===== ./docker-compose.yml =====
+services:
+    web:
+        image: odoo:19
+        depends_on:
+            - db
+
+        ports:
+            - '8069:8069'
+
+        environment:
+            - HOST=db
+            - USER=odoo
+            - PASSWORD=odoo
+
+        command: >
+            odoo
+            --addons-path=/usr/lib/python3/dist-packages/odoo/addons,/mnt/extra-addons
+
+        volumes:
+            - ./custom-addons:/mnt/extra-addons
+
+    db:
+        image: postgres:15
+
+        environment:
+            - POSTGRES_DB=postgres
+            - POSTGRES_USER=odoo
+            - POSTGRES_PASSWORD=odoo
+
+        volumes:
+            - odoo-db-data:/var/lib/postgresql/data
+
+volumes:
+    odoo-db-data:
+
+
+===== ./custom-addons/hms/__init__.py =====
+from . import models
+===== ./custom-addons/hms/views/patient_views.xml =====
+<odoo>
+
+    <record id="patient_list" model="ir.ui.view">
+        <field name="name">patient.list</field>
+        <field name="model">hms.patient</field>
+        <field name="arch" type="xml">
+            <list>
+                <field name="first_name"/>
+                <field name="last_name"/>
+                <field name="email"/>
+                <field name="age"/>
+                <field name="blood_type"/>
+                <field name="state"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="patient_form" model="ir.ui.view">
+        <field name="name">patient.form</field>
+        <field name="model">hms.patient</field>
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+
+                    <group>
+                        <field name="first_name"/>
+                        <field name="last_name"/>
+                        <field name="email"/>
+                        <field name="birth_date"/>
+                        <field name="age" readonly="1"/>
+                    </group>
+
+                    <group>
+                        <field name="department_id"/>
+                        <field name="department_capacity" readonly="1"/>
+                        <field name="doctor_ids" widget="many2many_tags"
+                               readonly="not department_id"/>
+                    </group>
+
+                    <group>
+                        <field name="blood_type"/>
+                        <field name="pcr"/>
+                        <field name="cr_ratio" required="pcr"/>
+                        <field name="state"/>
+                    </group>
+
+                    <group>
+                        <field name="address"/>
+                        <field name="image"/>
+                    </group>
+
+                    <group>
+                        <field name="history" invisible="age &lt; 50"/>
+                    </group>
+
+                    <notebook>
+                        <page string="Logs">
+                            <field name="log_ids">
+                                <list>
+                                    <field name="created_by"/>
+                                    <field name="date"/>
+                                    <field name="description"/>
+                                </list>
+                            </field>
+                        </page>
+                    </notebook>
+
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="patient_action" model="ir.actions.act_window">
+        <field name="name">Patients</field>
+        <field name="res_model">hms.patient</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+    <menuitem id="hms_root" name="HMS"/>
+
+    <menuitem id="hms_patient_menu"
+              name="Patients"
+              parent="hms_root"
+              action="patient_action"/>
+
+    <menuitem id="department_menu"
+              name="Departments"
+              parent="hms_root"
+              action="department_action"/>
+
+    <menuitem id="doctor_menu"
+              name="Doctors"
+              parent="hms_root"
+              action="doctor_action"/>
+
+</odoo>
+===== ./custom-addons/hms/views/doctor_views.xml =====
+<odoo>
+
+    <record id="doctor_list" model="ir.ui.view">
+        <field name="name">doctor.list</field>
+        <field name="model">hms.doctor</field>
+
+        <field name="arch" type="xml">
+            <list>
+                <field name="first_name"/>
+                <field name="last_name"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="doctor_form" model="ir.ui.view">
+        <field name="name">doctor.form</field>
+        <field name="model">hms.doctor</field>
+
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="first_name"/>
+                        <field name="last_name"/>
+                        <field name="image"/>
+                        <field name="department_id"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="doctor_action" model="ir.actions.act_window">
+        <field name="name">Doctors</field>
+        <field name="res_model">hms.doctor</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>
+
+===== ./custom-addons/hms/views/department_views.xml =====
+<odoo>
+
+    <record id="department_list" model="ir.ui.view">
+        <field name="name">department.list</field>
+        <field name="model">hms.department</field>
+
+        <field name="arch" type="xml">
+            <list>
+                <field name="name"/>
+                <field name="capacity"/>
+                <field name="is_opened"/>
+            </list>
+        </field>
+    </record>
+
+    <record id="department_form" model="ir.ui.view">
+        <field name="name">department.form</field>
+        <field name="model">hms.department</field>
+
+        <field name="arch" type="xml">
+            <form>
+                <sheet>
+                    <group>
+                        <field name="name"/>
+                        <field name="capacity"/>
+                        <field name="is_opened"/>
+                    </group>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <record id="department_action" model="ir.actions.act_window">
+        <field name="name">Departments</field>
+        <field name="res_model">hms.department</field>
+        <field name="view_mode">list,form</field>
+    </record>
+
+</odoo>
+
+===== ./custom-addons/hms/views/res_partner_views.xml =====
+<odoo>
+
+    <record id="view_partner_form_inherit_hms" model="ir.ui.view">
+        <field name="name">res.partner.form.inherit.hms</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+
+            <xpath expr="//page[@name='sale_purchase']//group[@name='misc']"
+                   position="inside">
+                <field name="related_patient_id"/>
+            </xpath>
+
+            <xpath expr="//field[@name='vat']" position="attributes">
+                <attribute name="required">customer_rank &gt; 0</attribute>
+            </xpath>
+
+        </field>
+    </record>
+
+    <record id="view_partner_list_inherit_hms" model="ir.ui.view">
+        <field name="name">res.partner.list.inherit.hms</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_list"/>
+        <field name="arch" type="xml">
+            <xpath expr="//field[@name='email']" position="after">
+                <field name="website"/>
+            </xpath>
+        </field>
+    </record>
+
+</odoo>
+===== ./custom-addons/hms/security/ir.model.access.csv =====
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_hms_patient,access_hms_patient,model_hms_patient,,1,1,1,1
+access_department,access_department,model_hms_department,,1,1,1,1
+access_doctor,access_doctor,model_hms_doctor,,1,1,1,1
+access_patient_log,access_patient_log,model_hms_patient_log,,1,1,1,1
+
+===== ./custom-addons/hms/__manifest__.py =====
+{
+    "name": "HMS",
+    "version": "1.0",
+    "author": "Mahmoud",
+    "license": "LGPL-3",
+
+    "depends": ["base", "contacts", "sale", "purchase"],
+
+    "data": [
+        "security/ir.model.access.csv",
+
+        "views/department_views.xml",
+        "views/doctor_views.xml",
+        "views/patient_views.xml",
+        "views/res_partner_views.xml",
+    ],
+
+    "installable": True,
+}
+===== ./custom-addons/hms/models/__init__.py =====
+from . import patient
+from . import department
+from . import doctor
+from . import patient_log
+from . import res_partner
+===== ./custom-addons/hms/models/department.py =====
+from odoo import models, fields
+
+
+class Department(models.Model):
+    _name = "hms.department"
+    _description = "Department"
+
+    name = fields.Char()
+
+    capacity = fields.Integer()
+
+    is_opened = fields.Boolean()
+
+    patient_ids = fields.One2many(
+        "hms.patient",
+        "department_id"
+    )
+===== ./custom-addons/hms/models/res_partner.py =====
+from odoo import models, fields, api
+from odoo.exceptions import ValidationError
+
+
+class ResPartner(models.Model):
+    _inherit = "res.partner"
+
+    related_patient_id = fields.Many2one(
+        "hms.patient",
+        string="Related Patient",
+    )
+
+
+    @api.constrains('related_patient_id', 'email')
+    def check_patient_email_conflict(self):
+        """Block linking a customer whose email already exists in patient model."""
+        for rec in self:
+            if rec.related_patient_id and rec.email:
+                conflict = self.env['hms.patient'].search([
+                    ('email', '=', rec.email),
+                ], limit=1)
+                if conflict:
+                    raise ValidationError(
+                        f"Cannot link: the email '{rec.email}' already belongs "
+                        f"to patient {conflict.first_name} {conflict.last_name}."
+                    )
+
+    @api.constrains('vat', 'customer_rank')
+    def check_vat_mandatory(self):
+        """Tax ID is mandatory for CRM customers."""
+        for rec in self:
+            if rec.customer_rank > 0 and not rec.vat:
+                raise ValidationError(
+                    "Tax ID is mandatory for customers. "
+                    f"Please fill it in for '{rec.name}'."
+                )
+
+
+    def unlink(self):
+        for rec in self:
+            if rec.related_patient_id:
+                raise ValidationError(
+                    f"Cannot delete '{rec.name}': this customer is linked to patient "
+                    f"{rec.related_patient_id.first_name} {rec.related_patient_id.last_name}."
+                )
+        return super().unlink()
+===== ./custom-addons/hms/models/doctor.py =====
+from odoo import models, fields
+
+class Doctor(models.Model):
+    _name = "hms.doctor"
+    _description = "Doctor"
+
+    first_name = fields.Char(required=True)
+
+    last_name = fields.Char(required=True)
+
+    image = fields.Binary()
+
+    department_id = fields.Many2one(
+        "hms.department"
+    )
+
+===== ./custom-addons/hms/models/patient_log.py =====
+from odoo import models, fields
+
+class PatientLog(models.Model):
+    _name = "hms.patient.log"
+    _description = "Patient Log"
+
+    patient_id = fields.Many2one(
+        "hms.patient"
+    )
+
+    created_by = fields.Many2one(
+        "res.users",
+        default=lambda self: self.env.user
+    )
+
+    date = fields.Datetime(
+        default=fields.Datetime.now
+    )
+
+    description = fields.Text()
+
+===== ./custom-addons/hms/models/patient.py =====
+from odoo import models, fields, api
+from odoo.exceptions import ValidationError
+from datetime import date
+import re
+
+
+class Patient(models.Model):
+    _name = "hms.patient"
+    _description = "Patient"
+
+    _sql_constraints = [
+        ('unique_email', 'UNIQUE(email)', 'This email is already used by another patient.'),
+    ]
+
+    first_name = fields.Char(required=True)
+    last_name = fields.Char(required=True)
+
+    birth_date = fields.Date()
+
+    history = fields.Html()
+
+    cr_ratio = fields.Float()
+
+    blood_type = fields.Selection([
+        ('a', 'A'),
+        ('b', 'B'),
+        ('ab', 'AB'),
+        ('o', 'O'),
+    ])
+
+    pcr = fields.Boolean()
+
+    image = fields.Binary()
+
+    address = fields.Text()
+
+    email = fields.Char(string="Email")
+
+    age = fields.Integer(compute='_compute_age', store=True)
+
+    state = fields.Selection([
+        ('undetermined', 'Undetermined'),
+        ('good', 'Good'),
+        ('fair', 'Fair'),
+        ('serious', 'Serious'),
+    ], default='undetermined')
+
+    department_id = fields.Many2one("hms.department")
+
+    department_capacity = fields.Integer(
+        related="department_id.capacity"
+    )
+
+    doctor_ids = fields.Many2many("hms.doctor")
+
+    log_ids = fields.One2many(
+        "hms.patient.log",
+        "patient_id"
+    )
+
+
+    @api.depends('birth_date')
+    def _compute_age(self):
+        today = date.today()
+        for rec in self:
+            if rec.birth_date:
+                rec.age = (
+                    today.year - rec.birth_date.year
+                    - ((today.month, today.day) < (rec.birth_date.month, rec.birth_date.day))
+                )
+            else:
+                rec.age = 0
+
+
+    @api.onchange('birth_date')
+    def onchange_birth_date(self):
+        if self.birth_date:
+            today = date.today()
+            age = (
+                today.year - self.birth_date.year
+                - ((today.month, today.day) < (self.birth_date.month, self.birth_date.day))
+            )
+            if age < 30:
+                self.pcr = True
+                return {
+                    'warning': {
+                        'title': 'Warning',
+                        'message': 'PCR checked automatically because age is less than 30',
+                    }
+                }
+
+
+    @api.constrains('email')
+    def check_email_format(self):
+        pattern = r'^[^@\s]+@[^@\s]+\.[^@\s]+$'
+        for rec in self:
+            if rec.email and not re.match(pattern, rec.email):
+                raise ValidationError(f"'{rec.email}' is not a valid email address.")
+
+    @api.constrains('pcr', 'cr_ratio')
+    def check_cr_ratio(self):
+        for rec in self:
+            if rec.pcr and not rec.cr_ratio:
+                raise ValidationError("CR Ratio is mandatory when PCR is checked.")
+
+    @api.constrains('department_id')
+    def check_department_opened(self):
+        for rec in self:
+            if rec.department_id and not rec.department_id.is_opened:
+                raise ValidationError("You can't choose a closed department.")
+
+
+    @api.model
+    def create(self, vals):
+        res = super().create(vals)
+        res.env['hms.patient.log'].create({
+            'patient_id': res.id,
+            'description': f"Patient created with state {res.state}",
+        })
+        return res
+
+    def write(self, vals):
+        res = super().write(vals)
+        if 'state' in vals:
+            self.env['hms.patient.log'].create({
+                'patient_id': self.id,
+                'description': f"State changed to {self.state}",
+            })
+        return res

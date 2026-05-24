@@ -1,0 +1,24 @@
+<odoo>
+
+    <record id="view_partner_form_inherit_hms" model="ir.ui.view">
+        <field name="name">res.partner.form.inherit.hms</field>
+        <field name="model">res.partner</field>
+        <field name="inherit_id" ref="base.view_partner_form"/>
+        <field name="arch" type="xml">
+
+            <xpath expr="//notebook" position="inside">
+                <page string="HMS">
+                    <group>
+                        <field name="related_patient_id"/>
+                    </group>
+                </page>
+            </xpath>
+
+            <xpath expr="//field[@name='vat']" position="attributes">
+                <attribute name="required">customer_rank &gt; 0</attribute>
+            </xpath>
+
+        </field>
+    </record>
+
+</odoo>

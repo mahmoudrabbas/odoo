@@ -1,10 +1,16 @@
 from odoo import models, fields, api
 from odoo.exceptions import ValidationError
+from datetime import date
+import re
 
 
 class Patient(models.Model):
     _name = "hms.patient"
     _description = "Patient"
+
+    _sql_constraints = [
+        ('unique_email', 'UNIQUE(email)', 'This email is already used by another patient.'),
+    ]
 
     first_name = fields.Char(required=True)
     last_name = fields.Char(required=True)
@@ -28,7 +34,9 @@ class Patient(models.Model):
 
     address = fields.Text()
 
-    age = fields.Integer()
+    email = fields.Char(string="Email")
+
+    age = fields.Integer(compute='_compute_age', store=True)
 
     state = fields.Selection([
         ('undetermined', 'Undetermined'),
@@ -50,16 +58,44 @@ class Patient(models.Model):
         "patient_id"
     )
 
-    @api.onchange('age')
-    def onchange_age(self):
-        if self.age and self.age < 30:
-            self.pcr = True
-            return {
-                'warning': {
-                    'title': 'Warning',
-                    'message': 'PCR checked automatically because age is less than 30'
+
+    @api.depends('birth_date')
+    def _compute_age(self):
+        today = date.today()
+        for rec in self:
+            if rec.birth_date:
+                rec.age = (
+                    today.year - rec.birth_date.year
+                    - ((today.month, today.day) < (rec.birth_date.month, rec.birth_date.day))
+                )
+            else:
+                rec.age = 0
+
+
+    @api.onchange('birth_date')
+    def onchange_birth_date(self):
+        if self.birth_date:
+            today = date.today()
+            age = (
+                today.year - self.birth_date.year
+                - ((today.month, today.day) < (self.birth_date.month, self.birth_date.day))
+            )
+            if age < 30:
+                self.pcr = True
+                return {
+                    'warning': {
+                        'title': 'Warning',
+                        'message': 'PCR checked automatically because age is less than 30',
+                    }
                 }
-            }
+
+
+    @api.constrains('email')
+    def check_email_format(self):
+        pattern = r'^[^@\s]+@[^@\s]+\.[^@\s]+$'
+        for rec in self:
+            if rec.email and not re.match(pattern, rec.email):
+                raise ValidationError(f"'{rec.email}' is not a valid email address.")
 
     @api.constrains('pcr', 'cr_ratio')
     def check_cr_ratio(self):
@@ -71,23 +107,23 @@ class Patient(models.Model):
     def check_department_opened(self):
         for rec in self:
             if rec.department_id and not rec.department_id.is_opened:
-                raise ValidationError("You can't choose a closed department")
+                raise ValidationError("You can't choose a closed department.")
+
 
     @api.model
     def create(self, vals):
         res = super().create(vals)
         res.env['hms.patient.log'].create({
             'patient_id': res.id,
-            'description': f"Patient created with state {res.state}"
+            'description': f"Patient created with state {res.state}",
         })
         return res
 
     def write(self, vals):
-        old_state = self.state
         res = super().write(vals)
         if 'state' in vals:
             self.env['hms.patient.log'].create({
                 'patient_id': self.id,
-                'description': f"State changed to {self.state}"
+                'description': f"State changed to {self.state}",
             })
         return res
