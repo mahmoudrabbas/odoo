@@ -8,10 +8,6 @@ class Patient(models.Model):
     _name = "hms.patient"
     _description = "Patient"
 
-    _sql_constraints = [
-        ('unique_email', 'UNIQUE(email)', 'This email is already used by another patient.'),
-    ]
-
     first_name = fields.Char(required=True)
     last_name = fields.Char(required=True)
 
@@ -96,6 +92,19 @@ class Patient(models.Model):
         for rec in self:
             if rec.email and not re.match(pattern, rec.email):
                 raise ValidationError(f"'{rec.email}' is not a valid email address.")
+
+    @api.constrains('email')
+    def _check_unique_email(self):
+        for rec in self:
+            if rec.email:
+                duplicate = self.search([
+                    ('email', '=', rec.email),
+                    ('id', '!=', rec.id),
+                ], limit=1)
+                if duplicate:
+                    raise ValidationError(
+                        f"The email '{rec.email}' is already used by another patient."
+                    )
 
     @api.constrains('pcr', 'cr_ratio')
     def check_cr_ratio(self):

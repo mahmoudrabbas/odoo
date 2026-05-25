@@ -1,0 +1,88 @@
+<odoo>
+
+    <template id="report_patient_template">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <div style="border: 2px solid #1a6db5; padding: 24px; margin: 10px;">
+
+                            <div class="row mb-3">
+                                <div class="col-8">
+                                    <h2 style="color: #c00000; font-weight: bold;">
+                                        Patient Status Report
+                                    </h2>
+                                </div>
+                                <div class="col-4 text-end">
+                                    <t t-if="doc.image">
+                                        <img t-att-src="image_data_uri(doc.image)"
+                                             style="max-width: 130px; max-height: 130px; border-radius: 4px;"/>
+                                    </t>
+                                </div>
+                            </div>
+
+                            <div class="row mb-4">
+                                <div class="col-6">
+                                    <p>
+                                        <strong>Name:</strong>
+                                        <t t-out="(doc.first_name or '') + ' ' + (doc.last_name or '')"/>
+                                    </p>
+                                    <p><strong>Age:</strong> <t t-out="doc.age"/></p>
+                                    <p>
+                                        <strong>Department:</strong>
+                                        <t t-out="doc.department_id.name or ''"/>
+                                    </p>
+                                    <p>
+                                        <strong>Doctors:</strong>
+                                        <t t-out="', '.join(d.first_name + ' ' + d.last_name for d in doc.doctor_ids)"/>
+                                    </p>
+                                </div>
+                                <div class="col-6">
+                                    <p><strong>Birth date:</strong> <t t-out="doc.birth_date"/></p>
+                                    <p><strong>PCR:</strong> <t t-out="doc.cr_ratio"/></p>
+                                    <p>
+                                        <strong>Blood Type:</strong>
+                                        <t t-out="dict(doc._fields['blood_type'].selection).get(doc.blood_type, '')"/>
+                                    </p>
+                                    <p><strong>Email:</strong> <t t-out="doc.email or ''"/></p>
+                                </div>
+                            </div>
+
+                            <h4 class="text-center" style="color: #c00000;">Log History</h4>
+                            <table class="table table-bordered" style="width: 100%;">
+                                <thead>
+                                    <tr style="background-color: #1a6db5; color: white;">
+                                        <th>User</th>
+                                        <th>Date</th>
+                                        <th>Info</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="doc.log_ids" t-as="log">
+                                        <tr>
+                                            <td><t t-out="log.created_by.name or ''"/></td>
+                                            <td><t t-out="log.date"/></td>
+                                            <td><t t-out="log.description or ''"/></td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+    <record id="patient_report_action" model="ir.actions.report">
+        <field name="name">Patient Status Report</field>
+        <field name="model">hms.patient</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">hms.report_patient_template</field>
+        <field name="report_file">hms.report_patient_template</field>
+        <field name="binding_model_id" ref="model_hms_patient"/>
+        <field name="binding_type">report</field>
+    </record>
+
+</odoo>

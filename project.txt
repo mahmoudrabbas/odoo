@@ -81,7 +81,8 @@ from . import models
                         <field name="department_id"/>
                         <field name="department_capacity" readonly="1"/>
                         <field name="doctor_ids" widget="many2many_tags"
-                               readonly="not department_id"/>
+                               readonly="not department_id"
+                               groups="hms.group_hms_manager"/>
                     </group>
 
                     <group>
@@ -138,7 +139,8 @@ from . import models
     <menuitem id="doctor_menu"
               name="Doctors"
               parent="hms_root"
-              action="doctor_action"/>
+              action="doctor_action"
+              groups="hms.group_hms_manager"/>
 
 </odoo>
 ===== ./custom-addons/hms/views/doctor_views.xml =====
@@ -232,9 +234,12 @@ from . import models
         <field name="inherit_id" ref="base.view_partner_form"/>
         <field name="arch" type="xml">
 
-            <xpath expr="//page[@name='sale_purchase']//group[@name='misc']"
-                   position="inside">
-                <field name="related_patient_id"/>
+            <xpath expr="//notebook" position="inside">
+                <page string="HMS">
+                    <group>
+                        <field name="related_patient_id"/>
+                    </group>
+                </page>
             </xpath>
 
             <xpath expr="//field[@name='vat']" position="attributes">
@@ -244,25 +249,154 @@ from . import models
         </field>
     </record>
 
-    <record id="view_partner_list_inherit_hms" model="ir.ui.view">
-        <field name="name">res.partner.list.inherit.hms</field>
-        <field name="model">res.partner</field>
-        <field name="inherit_id" ref="base.view_partner_list"/>
-        <field name="arch" type="xml">
-            <xpath expr="//field[@name='email']" position="after">
-                <field name="website"/>
-            </xpath>
-        </field>
-    </record>
-
 </odoo>
 ===== ./custom-addons/hms/security/ir.model.access.csv =====
 id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
-access_hms_patient,access_hms_patient,model_hms_patient,,1,1,1,1
-access_department,access_department,model_hms_department,,1,1,1,1
-access_doctor,access_doctor,model_hms_doctor,,1,1,1,1
-access_patient_log,access_patient_log,model_hms_patient_log,,1,1,1,1
+access_hms_patient_user,HMS Patient User,model_hms_patient,hms.group_hms_user,1,1,1,0
+access_hms_department_user,HMS Department User,model_hms_department,hms.group_hms_user,1,0,0,0
+access_hms_doctor_user,HMS Doctor User,model_hms_doctor,hms.group_hms_user,1,0,0,0
+access_hms_patient_log_user,HMS Patient Log User,model_hms_patient_log,hms.group_hms_user,1,1,1,0
+access_hms_patient_manager,HMS Patient Manager,model_hms_patient,hms.group_hms_manager,1,1,1,1
+access_hms_department_manager,HMS Department Manager,model_hms_department,hms.group_hms_manager,1,1,1,1
+access_hms_doctor_manager,HMS Doctor Manager,model_hms_doctor,hms.group_hms_manager,1,1,1,1
+access_hms_patient_log_manager,HMS Patient Log Manager,model_hms_patient_log,hms.group_hms_manager,1,1,1,1
+===== ./custom-addons/hms/security/groups.xml =====
+<odoo>
+    <record id="module_category_hms" model="ir.module.category">
+        <field name="name">Hospital Management System</field>
+        <field name="sequence">100</field>
+    </record>
 
+    <record id="group_hms_user" model="res.groups">
+        <field name="name">User</field>
+        <field name="category_id" ref="module_category_hms"/>
+    </record>
+
+    <record id="group_hms_manager" model="res.groups">
+        <field name="name">Manager</field>
+        <field name="category_id" ref="module_category_hms"/>
+        <!-- Manager inherits all User permissions -->
+        <field name="implied_ids" eval="[(4, ref('hms.group_hms_user'))]"/>
+    </record>
+</odoo>
+===== ./custom-addons/hms/security/record_rules.xml =====
+<odoo>
+    <!-- Users can only read/write their OWN patient records -->
+    <record id="rule_hms_patient_user" model="ir.rule">
+        <field name="name">HMS Patient: Users see own records only</field>
+        <field name="model_id" ref="model_hms_patient"/>
+        <field name="domain_force">[('create_uid', '=', user.id)]</field>
+        <field name="groups" eval="[(4, ref('hms.group_hms_user'))]"/>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="False"/>
+    </record>
+
+    <!-- Managers can access ALL patient records -->
+    <record id="rule_hms_patient_manager" model="ir.rule">
+        <field name="name">HMS Patient: Managers see all records</field>
+        <field name="model_id" ref="model_hms_patient"/>
+        <field name="domain_force">[(1, '=', 1)]</field>
+        <field name="groups" eval="[(4, ref('hms.group_hms_manager'))]"/>
+        <field name="perm_read" eval="True"/>
+        <field name="perm_write" eval="True"/>
+        <field name="perm_create" eval="True"/>
+        <field name="perm_unlink" eval="True"/>
+    </record>
+</odoo>
+===== ./custom-addons/hms/reports/patient_report.xml =====
+<odoo>
+
+    <template id="report_patient_template">
+        <t t-call="web.html_container">
+            <t t-foreach="docs" t-as="doc">
+                <t t-call="web.external_layout">
+                    <div class="page">
+                        <div style="border: 2px solid #1a6db5; padding: 24px; margin: 10px;">
+
+                            <!-- Title + Photo -->
+                            <div class="row mb-3">
+                                <div class="col-8">
+                                    <h2 style="color: #c00000; font-weight: bold;">
+                                        Patient Status Report
+                                    </h2>
+                                </div>
+                                <div class="col-4 text-end">
+                                    <t t-if="doc.image">
+                                        <img t-att-src="image_data_uri(doc.image)"
+                                             style="max-width: 130px; max-height: 130px; border-radius: 4px;"/>
+                                    </t>
+                                </div>
+                            </div>
+
+                            <!-- Patient Info: two columns -->
+                            <div class="row mb-4">
+                                <div class="col-6">
+                                    <p>
+                                        <strong>Name:</strong>
+                                        <t t-out="(doc.first_name or '') + ' ' + (doc.last_name or '')"/>
+                                    </p>
+                                    <p><strong>Age:</strong> <t t-out="doc.age"/></p>
+                                    <p>
+                                        <strong>Department:</strong>
+                                        <t t-out="doc.department_id.name or ''"/>
+                                    </p>
+                                    <p>
+                                        <strong>Doctors:</strong>
+                                        <t t-out="', '.join(d.first_name + ' ' + d.last_name for d in doc.doctor_ids)"/>
+                                    </p>
+                                </div>
+                                <div class="col-6">
+                                    <p><strong>Birth date:</strong> <t t-out="doc.birth_date"/></p>
+                                    <p><strong>PCR:</strong> <t t-out="doc.cr_ratio"/></p>
+                                    <p>
+                                        <strong>Blood Type:</strong>
+                                        <t t-out="dict(doc._fields['blood_type'].selection).get(doc.blood_type, '')"/>
+                                    </p>
+                                    <p><strong>Email:</strong> <t t-out="doc.email or ''"/></p>
+                                </div>
+                            </div>
+
+                            <!-- Log History table -->
+                            <h4 class="text-center" style="color: #c00000;">Log History</h4>
+                            <table class="table table-bordered" style="width: 100%;">
+                                <thead>
+                                    <tr style="background-color: #1a6db5; color: white;">
+                                        <th>User</th>
+                                        <th>Date</th>
+                                        <th>Info</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <t t-foreach="doc.log_ids" t-as="log">
+                                        <tr>
+                                            <td><t t-out="log.created_by.name or ''"/></td>
+                                            <td><t t-out="log.date"/></td>
+                                            <td><t t-out="log.description or ''"/></td>
+                                        </tr>
+                                    </t>
+                                </tbody>
+                            </table>
+
+                        </div>
+                    </div>
+                </t>
+            </t>
+        </t>
+    </template>
+
+    <record id="patient_report_action" model="ir.actions.report">
+        <field name="name">Patient Status Report</field>
+        <field name="model">hms.patient</field>
+        <field name="report_type">qweb-pdf</field>
+        <field name="report_name">hms.report_patient_template</field>
+        <field name="report_file">hms.report_patient_template</field>
+        <field name="binding_model_id" ref="model_hms_patient"/>
+        <field name="binding_type">report</field>
+    </record>
+
+</odoo>
 ===== ./custom-addons/hms/__manifest__.py =====
 {
     "name": "HMS",
@@ -273,12 +407,16 @@ access_patient_log,access_patient_log,model_hms_patient_log,,1,1,1,1
     "depends": ["base", "contacts", "sale", "purchase"],
 
     "data": [
+        "security/groups.xml",
         "security/ir.model.access.csv",
+        "security/record_rules.xml",
 
         "views/department_views.xml",
         "views/doctor_views.xml",
         "views/patient_views.xml",
         "views/res_partner_views.xml",
+
+        "reports/patient_report.xml",
     ],
 
     "installable": True,
@@ -320,14 +458,14 @@ class ResPartner(models.Model):
         string="Related Patient",
     )
 
-
     @api.constrains('related_patient_id', 'email')
     def check_patient_email_conflict(self):
-        """Block linking a customer whose email already exists in patient model."""
+        """Block linking a customer whose email already exists in another patient."""
         for rec in self:
             if rec.related_patient_id and rec.email:
                 conflict = self.env['hms.patient'].search([
                     ('email', '=', rec.email),
+                    ('id', '!=', rec.related_patient_id.id),
                 ], limit=1)
                 if conflict:
                     raise ValidationError(
@@ -339,12 +477,15 @@ class ResPartner(models.Model):
     def check_vat_mandatory(self):
         """Tax ID is mandatory for CRM customers."""
         for rec in self:
-            if rec.customer_rank > 0 and not rec.vat:
+            if (
+                rec.customer_rank > 0
+                and not rec.vat
+                and not self.env.context.get('install_mode')
+            ):
                 raise ValidationError(
                     "Tax ID is mandatory for customers. "
                     f"Please fill it in for '{rec.name}'."
                 )
-
 
     def unlink(self):
         for rec in self:

@@ -2,3 +2,8 @@
 
 ![image 2](preview/1.png)
 ![image 1](preview/0.png)
+
+
+
+docker compose down -v  
+docker compose up
